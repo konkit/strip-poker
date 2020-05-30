@@ -17,6 +17,11 @@
         </div>
       </div>
     </div>
+
+    <div>
+      <button @click="sendReveal()">Reveal</button>
+      <button @click="sendReset()">Reset</button>
+    </div>
   </div>
 </template>
 
@@ -56,8 +61,25 @@ export default class Home extends Vue {
 
     let command = JSON.stringify({messagetype: "selectvote", id: this.yourId, vote: voteValue.toString()})
 
-    console.log("Command to be sent: ", command)
+    this.sendCommand(command)
+  }
 
+  sendReveal(voteValue: VoteValue) {
+    let command = JSON.stringify({messagetype: "sendreveal", id: this.yourId})
+
+    this.sendCommand(command)
+  }
+
+  sendReset(voteValue: VoteValue) {
+    this.yourVote = null
+
+    let command = JSON.stringify({messagetype: "sendreset", id: this.yourId})
+
+    this.sendCommand(command)
+  }
+
+  sendCommand(command) {
+    console.log("Command to be sent: ", command)
     this.ws.send(command)
   }
 

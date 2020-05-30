@@ -1,7 +1,6 @@
 package tech.konkit
 
 import com.google.gson.Gson
-import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import io.ktor.http.cio.websocket.CloseReason
@@ -9,11 +8,13 @@ import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.WebSocketSession
 import kotlinx.coroutines.Deferred
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 
 data class UserData(val id: String, val webSocketSession: WebSocketSession, val vote: String)
 
 data class SelectVoteMessage(val messagetype: String, val id: String, val vote: String)
+data class SendRevealMessage(val messagetype: String, val id: String)
 
 data class UserStatus(val id: String, val vote: String)
 data class UserStatusMessage(val messagetype: String, val you: String, val users: List<UserStatus>)
@@ -22,7 +23,8 @@ class EstimationSession() {
 
     private val gson = Gson()
 
-    private var users = mutableMapOf<String, UserData>()
+    private var revealed: Boolean = false
+    private var users = ConcurrentHashMap<String, UserData>()
 
     suspend fun onUserJoin(webSocketSession: WebSocketSession): UserData {
         val userData = UserData(id = UUID.randomUUID().toString(), webSocketSession = webSocketSession, vote = "")
@@ -62,6 +64,22 @@ class EstimationSession() {
             } else {
                 println("Cannot change vote - user does not exist")
             }
+        } else if (messageType == "sendreveal") {
+            this.revealed = true
+
+            users.forEach { d ->
+                sendStateOfUsers(d.value)
+            }
+        } else if (messageType == "sendreset") {
+            this.revealed = false
+
+            users.forEach { d ->
+                users.replace(d.key, d.value.copy(vote = ""))
+            }
+
+            users.forEach { d ->
+                sendStateOfUsers(d.value)
+            }
         }
     }
 
@@ -73,7 +91,13 @@ class EstimationSession() {
             println("User ${userData.id} removed")
         }
 
-        users.forEach { d -> sendStateOfUsers(d.value) }
+        users.forEach { d ->
+            try {
+                sendStateOfUsers(d.value)
+            } catch(e: Throwable) {
+                println("Could not send state of user")
+            }
+        }
     }
 
     suspend fun onError(userData: UserData?, e: Throwable, closeReason: Deferred<CloseReason?>) {
@@ -86,11 +110,27 @@ class EstimationSession() {
             println("User ${userData.id} removed")
         }
 
-        users.forEach { d -> sendStateOfUsers(d.value) }
+        users.forEach { d ->
+            try {
+                sendStateOfUsers(d.value)
+            } catch(e: Throwable) {
+                println("Could not send state of user - $e")
+            }
+        }
     }
 
     private suspend fun sendStateOfUsers(d: UserData) {
-        val message = UserStatusMessage("userstatus", d.id, users.values.map { u -> UserStatus(u.id, u.vote) })
+        val userStatuses = users.values.map { u ->
+            if (revealed) {
+                UserStatus(u.id, u.vote)
+            } else if (u.vote.isBlank()) {
+                UserStatus(u.id, "")
+            } else {
+                UserStatus(u.id, "X")
+            }
+        }
+
+        val message = UserStatusMessage("userstatus", d.id, userStatuses)
 
         d.webSocketSession.send(Frame.Text(gson.toJson(message)))
     }
