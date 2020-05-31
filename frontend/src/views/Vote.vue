@@ -111,7 +111,6 @@ export default class Home extends Vue {
     const roomId = this.$route.params.roomid
     this.ws = new WebSocket("ws://localhost:9999/voteconnection/" + roomId);
 
-    // Connection opened
     this.ws.addEventListener("open", event => {
       this.connected = true;
 

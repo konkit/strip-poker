@@ -1,9 +1,10 @@
 <template>
-  <div class="about">
-    <h1>This is an about page</h1>
+  <div class="selectroom">
+    <h1>Strip Poker</h1>
+    <h2>simple planning poker app with T-shirt size estimates and an inappropriate name</h2>
 
     <div>
-      <h1>Select Room</h1>
+      <h3>Enter room number</h3>
 
       <input type="text" v-model="roomNumber" />
       <button @click="joinRoom()">Join</button>

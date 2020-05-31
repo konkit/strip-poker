@@ -36,7 +36,6 @@ fun Application.module(testing: Boolean = false) {
                 throw Exception("Room number empty")
             }
 
-            var userData: UserData? = null
 
             val estimationSession: EstimationSession = if (!sessions.containsKey(roomNumber)) {
                 val newSession = EstimationSession()
@@ -46,34 +45,39 @@ fun Application.module(testing: Boolean = false) {
                 sessions.get(roomNumber)!!
             }
 
+            var userId: UserId? = null
+
             try {
-                userData = estimationSession.onUserJoin(this)
+                userId = estimationSession.onUserJoin(this)
 
                 while (true) {
                     val frame = incoming.receive()
                     if (frame is Frame.Text) {
-                        estimationSession.onUserMessage(userData, frame.readText())
+                        estimationSession.onUserMessage(userId, frame.readText())
                     }
                 }
 
             } catch (e: ClosedReceiveChannelException) {
-                estimationSession.onUserDisconnected(userData, closeReason)
-                if (estimationSession.hasLeaderLeft()) {
-                    estimationSession.disconnectEverybody()
-                    sessions.remove(roomNumber)
+                estimationSession.onUserDisconnected(userId, closeReason)
 
-                    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
+                if (estimationSession.hasLeaderLeft()) {
+                    removeRoom(estimationSession, roomNumber)
                 }
             } catch (e: Throwable) {
-                estimationSession.onError(userData, e, closeReason)
-                if (estimationSession.hasLeaderLeft()) {
-                    estimationSession.disconnectEverybody()
-                    sessions.remove(roomNumber)
+                estimationSession.onError(userId, e, closeReason)
 
-                    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
+                if (estimationSession.hasLeaderLeft()) {
+                   removeRoom(estimationSession, roomNumber)
                 }
             }
         }
     }
+}
+
+private suspend fun removeRoom(estimationSession: EstimationSession, roomNumber: String) {
+    estimationSession.disconnectEverybody()
+    sessions.remove(roomNumber)
+
+    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
 }
 

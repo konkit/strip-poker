@@ -1,8 +1,5 @@
 package tech.konkit
 
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import io.ktor.http.cio.websocket.CloseReason
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.WebSocketSession
@@ -10,84 +7,113 @@ import kotlinx.coroutines.Deferred
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+data class UserId(val id: String) {
+    override fun toString(): String {
+        return id.toString()
+    }
 
-data class UserData(val id: String, val webSocketSession: WebSocketSession, val vote: String)
+    companion object {
+        val empty = UserId("")
 
-interface Message {
-    val messagetype: String
+        fun generate() = UserId(UUID.randomUUID().toString())
+    }
 }
-data class SelectVoteMessage(override val messagetype: String, val id: String, val vote: String) : Message
-data class SendRevealMessage(override val messagetype: String, val id: String) : Message
-data class SendResetMessage(override val messagetype: String, val id: String) : Message
 
-
-data class UserStatusMessage(override val messagetype: String,
-                             val yourId: String,
-                             val leaderId: String,
-                             val users: List<UserStatus>) : Message
-
-data class UserStatus(val id: String, val vote: String)
-
+data class UserData(val webSocketSession: WebSocketSession, val vote: String)
 
 class EstimationSession() {
 
-    private val gson = Gson()
+    private val serializer = MessageSerializer()
 
     private var revealed: Boolean = false
-    private var users = ConcurrentHashMap<String, UserData>()
-    private var leaderId: String = ""
+    private var users = ConcurrentHashMap<UserId, UserData>()
+    private var leaderId: UserId = UserId.empty
 
-    suspend fun onUserJoin(webSocketSession: WebSocketSession): UserData {
-        val userData = UserData(id = UUID.randomUUID().toString(), webSocketSession = webSocketSession, vote = "")
+    suspend fun onUserJoin(webSocketSession: WebSocketSession): UserId {
+        val userId = UserId.generate()
+        val userData = UserData(webSocketSession = webSocketSession, vote = "")
 
-        if (leaderId == "") {
-            leaderId = userData.id
+        if (leaderId == UserId.empty) {
+            leaderId = userId
         }
 
-        println("User ${userData.id} connected")
+        println("User ${userId} connected")
 
-        users[userData.id] = userData
+        users[userId] = userData
 
         broadcastUsersStatus()
 
-        return userData
+        return userId
     }
 
-    suspend fun onUserMessage(userData: UserData, rawMessage: String) {
+    suspend fun onUserMessage(userId: UserId, rawMessage: String) {
         println("Incoming message : ${rawMessage}")
 
-        val jsonObject: JsonObject = JsonParser.parseString(rawMessage).asJsonObject
+        val inputMessage = serializer.deserializeInputMessage(rawMessage)
 
-        val messageType = jsonObject.get("messagetype").asString
+        when (inputMessage) {
+            is SelectVoteInputMessage -> handleVoteSelection(inputMessage, userId)
+            is SendRevealInputMessage -> handleVoteReveal(userId)
+            is SendResetInputMessage -> handleReset(userId)
+        }
+    }
 
-        if (messageType == "selectvote") {
-            println("Changing vote")
+    private suspend fun handleVoteSelection(inputMessage: SelectVoteInputMessage, userId: UserId) {
+        val oldValue = users[userId]
 
-            val message = gson.fromJson(rawMessage, SelectVoteMessage::class.java)
-            val oldValue = users[message.id]
+        if (oldValue != null) {
+            val newValue = oldValue.copy(vote = inputMessage.vote)
 
-            if (oldValue != null) {
-                val newValue = oldValue.copy(vote = message.vote)
-
-                users.replace(userData.id, newValue)
-
-                broadcastUsersStatus()
-            } else {
-                println("Cannot change vote - user does not exist")
-            }
-        } else if (messageType == "sendreveal") {
-            this.revealed = true
+            users.replace(userId, newValue)
 
             broadcastUsersStatus()
-        } else if (messageType == "sendreset") {
+        } else {
+            println("Cannot change vote - user does not exist")
+        }
+    }
+
+    private suspend fun handleReset(userId: UserId) {
+        if (leaderId == userId) {
             this.revealed = false
 
             users.forEach { d ->
                 users.replace(d.key, d.value.copy(vote = ""))
             }
-
-            broadcastUsersStatus()
         }
+
+        broadcastUsersStatus()
+    }
+
+    private suspend fun handleVoteReveal(userId: UserId) {
+        if (leaderId == userId) {
+            this.revealed = true
+        }
+
+        broadcastUsersStatus()
+    }
+
+    suspend fun onUserDisconnected(userId: UserId?, closeReason: Deferred<CloseReason?>) {
+        println("onClose $closeReason")
+
+        if (userId != null) {
+            users.remove(userId)
+            println("User ${userId} removed")
+        }
+
+        broadcastUsersStatus()
+    }
+
+    suspend fun onError(userId: UserId?, e: Throwable, closeReason: Deferred<CloseReason?>) {
+        println("onError $closeReason")
+
+        e.printStackTrace()
+
+        if (userId != null) {
+            users.remove(userId)
+            println("User ${userId} removed")
+        }
+
+        broadcastUsersStatus()
     }
 
     fun hasLeaderLeft(): Boolean {
@@ -99,56 +125,32 @@ class EstimationSession() {
             try {
                 d.value.webSocketSession.close()
 
-            } catch(e: Throwable) {
+            } catch (e: Throwable) {
                 println("Could not send statuses of users - $e")
             }
         }
     }
 
-    suspend fun onUserDisconnected(userData: UserData?, closeReason: Deferred<CloseReason?>) {
-        println("onClose $closeReason")
-
-        if (userData != null) {
-            users.remove(userData.id)
-            println("User ${userData.id} removed")
-        }
-
-        broadcastUsersStatus()
-    }
-
-    suspend fun onError(userData: UserData?, e: Throwable, closeReason: Deferred<CloseReason?>) {
-        println("onError ${closeReason.await()}")
-
-        e.printStackTrace()
-
-        if (userData != null) {
-            users.remove(userData.id)
-            println("User ${userData.id} removed")
-        }
-
-        broadcastUsersStatus()
-    }
-
     private suspend fun broadcastUsersStatus() {
-        users.forEach { d ->
+        users.forEach { (userId, userData) ->
             try {
                 val allVotesFilled = users.values.all { v -> v.vote.isNotBlank() }
 
-                val userStatuses = users.values.map { u ->
+                val userStatuses = users.map { u ->
                     if (allVotesFilled || revealed) {
-                        UserStatus(u.id, u.vote)
-                    } else if (u.vote.isBlank()) {
-                        UserStatus(u.id, "")
+                        UserStatus(u.key.id, u.value.vote)
+                    } else if (u.value.vote.isBlank()) {
+                        UserStatus(u.key.id, "")
                     } else {
-                        UserStatus(u.id, "X")
+                        UserStatus(u.key.id, "X")
                     }
                 }
 
-                val message = UserStatusMessage("userstatus", d.value.id, leaderId, userStatuses)
+                val message = UserStatusOutputMessage("userstatus", userId.id, leaderId.id, userStatuses)
 
-                d.value.webSocketSession.send(Frame.Text(gson.toJson(message)))
-            } catch(e: Throwable) {
-                println("Could not send statuses of users - $e")
+                userData.webSocketSession.send(Frame.Text(serializer.serializeOutputMessage(message)))
+            } catch (e: Throwable) {
+                println("Could not send user statuses to user ${userId} - $e")
             }
         }
     }
