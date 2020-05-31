@@ -4,22 +4,7 @@ import io.ktor.http.cio.websocket.CloseReason
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.WebSocketSession
 import kotlinx.coroutines.Deferred
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-
-data class UserId(val id: String) {
-    override fun toString(): String {
-        return id.toString()
-    }
-
-    companion object {
-        val empty = UserId("")
-
-        fun generate() = UserId(UUID.randomUUID().toString())
-    }
-}
-
-data class UserData(val webSocketSession: WebSocketSession, val vote: String)
 
 class EstimationSession() {
 
@@ -29,15 +14,12 @@ class EstimationSession() {
     private var users = ConcurrentHashMap<UserId, UserData>()
     private var leaderId: UserId = UserId.empty
 
-    suspend fun onUserJoin(webSocketSession: WebSocketSession): UserId {
-        val userId = UserId.generate()
+    suspend fun onUserJoin(userId: UserId, webSocketSession: WebSocketSession): UserId {
         val userData = UserData(webSocketSession = webSocketSession, vote = "")
 
         if (leaderId == UserId.empty) {
             leaderId = userId
         }
-
-        println("User ${userId} connected")
 
         users[userId] = userData
 
@@ -47,8 +29,6 @@ class EstimationSession() {
     }
 
     suspend fun onUserMessage(userId: UserId, rawMessage: String) {
-        println("Incoming message : ${rawMessage}")
-
         val inputMessage = serializer.deserializeInputMessage(rawMessage)
 
         when (inputMessage) {
@@ -58,15 +38,30 @@ class EstimationSession() {
         }
     }
 
+    suspend fun onUserDisconnected(userId: UserId?, closeReason: Deferred<CloseReason?>) {
+        if (userId != null) {
+            users.remove(userId)
+        }
+
+        broadcastUsersStatus()
+    }
+
     private suspend fun handleVoteSelection(inputMessage: SelectVoteInputMessage, userId: UserId) {
         val oldValue = users[userId]
 
         if (oldValue != null) {
-            val newValue = oldValue.copy(vote = inputMessage.vote)
+            if (!revealed) {
+                val newValue = oldValue.copy(vote = inputMessage.vote)
 
-            users.replace(userId, newValue)
+                users.replace(userId, newValue)
 
-            broadcastUsersStatus()
+                val allVotesFilled = users.values.all { v -> v.vote.isNotBlank() }
+                if (allVotesFilled) {
+                    revealed = true
+                }
+
+                broadcastUsersStatus()
+            }
         } else {
             println("Cannot change vote - user does not exist")
         }
@@ -92,61 +87,21 @@ class EstimationSession() {
         broadcastUsersStatus()
     }
 
-    suspend fun onUserDisconnected(userId: UserId?, closeReason: Deferred<CloseReason?>) {
-        println("onClose $closeReason")
-
-        if (userId != null) {
-            users.remove(userId)
-            println("User ${userId} removed")
-        }
-
-        broadcastUsersStatus()
-    }
-
-    suspend fun onError(userId: UserId?, e: Throwable, closeReason: Deferred<CloseReason?>) {
-        println("onError $closeReason")
-
-        e.printStackTrace()
-
-        if (userId != null) {
-            users.remove(userId)
-            println("User ${userId} removed")
-        }
-
-        broadcastUsersStatus()
-    }
-
-    fun hasLeaderLeft(): Boolean {
-        return users.contains(leaderId)
-    }
-
-    suspend fun disconnectEverybody() {
-        users.forEach { d ->
-            try {
-                d.value.webSocketSession.close()
-
-            } catch (e: Throwable) {
-                println("Could not send statuses of users - $e")
+    private suspend fun broadcastUsersStatus() {
+        val userStatuses = users.map { (userId, userData) ->
+            if (revealed) {
+                UserStatus(userId.id, userData.vote)
+            } else if (userData.vote.isBlank()) {
+                UserStatus(userId.id, "")
+            } else {
+                UserStatus(userId.id, "X")
             }
         }
-    }
 
-    private suspend fun broadcastUsersStatus() {
         users.forEach { (userId, userData) ->
             try {
-                val allVotesFilled = users.values.all { v -> v.vote.isNotBlank() }
-
-                val userStatuses = users.map { u ->
-                    if (allVotesFilled || revealed) {
-                        UserStatus(u.key.id, u.value.vote)
-                    } else if (u.value.vote.isBlank()) {
-                        UserStatus(u.key.id, "")
-                    } else {
-                        UserStatus(u.key.id, "X")
-                    }
-                }
-
-                val message = UserStatusOutputMessage("userstatus", userId.id, leaderId.id, userStatuses)
+                val message =
+                    UserStatusOutputMessage("userstatus", userId.id, userData.vote, leaderId.id, revealed, userStatuses)
 
                 userData.webSocketSession.send(Frame.Text(serializer.serializeOutputMessage(message)))
             } catch (e: Throwable) {
@@ -156,3 +111,15 @@ class EstimationSession() {
     }
 
 }
+
+data class UserId(val id: String) {
+    override fun toString(): String {
+        return id
+    }
+
+    companion object {
+        val empty = UserId("")
+    }
+}
+
+data class UserData(val webSocketSession: WebSocketSession, val vote: String)

@@ -8,12 +8,14 @@
 
       <input type="text" v-model="roomNumber" />
       <button @click="joinRoom()">Join</button>
+      <button @click="createRoom()">Create room</button>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Vue } from "vue-property-decorator";
+import axios from "axios"
 
 @Component
 export default class SelectRoom extends Vue {
@@ -25,6 +27,12 @@ export default class SelectRoom extends Vue {
 
   joinRoom() {
     this.$router.push({name: "Vote", params: {roomid: this.roomNumber}})
+  }
+
+  createRoom() {
+    axios
+      .post("http://localhost:9999/createroom", {})
+      .then(response => this.$router.push({name: "Vote", params: {roomid: response.data}}))
   }
 }
 </script>

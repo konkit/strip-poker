@@ -1,23 +1,23 @@
 package tech.konkit
 
 import io.ktor.application.*
+import io.ktor.features.CORS
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.http.*
 import io.ktor.websocket.*
 import io.ktor.http.cio.websocket.*
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import io.ktor.sessions.*
+import io.ktor.util.generateNonce
 import java.time.*
-import java.util.concurrent.ConcurrentHashMap
-
-
-val sessions: ConcurrentHashMap<String, EstimationSession> = ConcurrentHashMap()
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused") // Referenced in application.conf
 @kotlin.jvm.JvmOverloads
 fun Application.module(testing: Boolean = false) {
+    val roomManager = RoomManager()
+
     install(io.ktor.websocket.WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
@@ -25,30 +25,62 @@ fun Application.module(testing: Boolean = false) {
         masking = false
     }
 
+    install(CORS)
+    {
+        method(HttpMethod.Options)
+        header(HttpHeaders.XForwardedProto)
+        header(HttpHeaders.AccessControlAllowOrigin)
+        anyHost()
+        allowCredentials = true
+        allowNonSimpleContentTypes = true
+    }
+
     routing {
         get("/") {
             call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
         }
 
+        post("/createroom") {
+            val roomNumber = roomManager.createRoom()
+            call.respondText(roomNumber, contentType = ContentType.Text.Plain)
+        }
+
+        // This enables the use of sessions to keep information between requests/refreshes of the browser.
+        install(Sessions) {
+            cookie<UserSession>("SESSION")
+        }
+
+        // This adds an interceptor that will create a specific session in each request if no session is available already.
+        intercept(ApplicationCallPipeline.Features) {
+            if (call.sessions.get<UserSession>() == null) {
+                call.sessions.set(UserSession(generateNonce()))
+            }
+        }
+
         webSocket("/voteconnection/{roomnumber}") {
             val roomNumber = call.parameters["roomnumber"]
             if (roomNumber.isNullOrBlank()) {
-                throw Exception("Room number empty")
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Room number is empty"))
+                return@webSocket
             }
 
+            val cookieSession = call.sessions.get<UserSession>()
 
-            val estimationSession: EstimationSession = if (!sessions.containsKey(roomNumber)) {
-                val newSession = EstimationSession()
-                sessions.put(roomNumber, newSession)
-                newSession
-            } else {
-                sessions.get(roomNumber)!!
+            if (cookieSession == null) {
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "No session"))
+                return@webSocket
             }
 
-            var userId: UserId? = null
+            val userId = UserId(cookieSession.id)
+            val estimationSession = roomManager.getSessionByRoomNumber(roomNumber)
+
+            if (estimationSession == null) {
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "The room ${roomNumber} does not exist"))
+                return@webSocket
+            }
 
             try {
-                userId = estimationSession.onUserJoin(this)
+                estimationSession.onUserJoin(userId, this)
 
                 while (true) {
                     val frame = incoming.receive()
@@ -57,27 +89,14 @@ fun Application.module(testing: Boolean = false) {
                     }
                 }
 
-            } catch (e: ClosedReceiveChannelException) {
-                estimationSession.onUserDisconnected(userId, closeReason)
-
-                if (estimationSession.hasLeaderLeft()) {
-                    removeRoom(estimationSession, roomNumber)
-                }
-            } catch (e: Throwable) {
-                estimationSession.onError(userId, e, closeReason)
-
-                if (estimationSession.hasLeaderLeft()) {
-                   removeRoom(estimationSession, roomNumber)
-                }
+            } finally {
+                estimationSession.onUserDisconnected(userId!!, closeReason)
             }
         }
     }
 }
 
-private suspend fun removeRoom(estimationSession: EstimationSession, roomNumber: String) {
-    estimationSession.disconnectEverybody()
-    sessions.remove(roomNumber)
+data class UserSession(val id: String)
 
-    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
-}
+
 
