@@ -13,11 +13,21 @@ import java.util.concurrent.ConcurrentHashMap
 
 data class UserData(val id: String, val webSocketSession: WebSocketSession, val vote: String)
 
-data class SelectVoteMessage(val messagetype: String, val id: String, val vote: String)
-data class SendRevealMessage(val messagetype: String, val id: String)
+interface Message {
+    val messagetype: String
+}
+data class SelectVoteMessage(override val messagetype: String, val id: String, val vote: String) : Message
+data class SendRevealMessage(override val messagetype: String, val id: String) : Message
+data class SendResetMessage(override val messagetype: String, val id: String) : Message
+
+
+data class UserStatusMessage(override val messagetype: String,
+                             val yourId: String,
+                             val leaderId: String,
+                             val users: List<UserStatus>) : Message
 
 data class UserStatus(val id: String, val vote: String)
-data class UserStatusMessage(val messagetype: String, val you: String, val users: List<UserStatus>)
+
 
 class EstimationSession() {
 
@@ -25,17 +35,20 @@ class EstimationSession() {
 
     private var revealed: Boolean = false
     private var users = ConcurrentHashMap<String, UserData>()
+    private var leaderId: String = ""
 
     suspend fun onUserJoin(webSocketSession: WebSocketSession): UserData {
         val userData = UserData(id = UUID.randomUUID().toString(), webSocketSession = webSocketSession, vote = "")
+
+        if (leaderId == "") {
+            leaderId = userData.id
+        }
 
         println("User ${userData.id} connected")
 
         users[userData.id] = userData
 
-        users.forEach { d ->
-            sendStateOfUsers(d.value)
-        }
+        broadcastUsersStatus()
 
         return userData
     }
@@ -58,18 +71,14 @@ class EstimationSession() {
 
                 users.replace(userData.id, newValue)
 
-                users.forEach { d ->
-                    sendStateOfUsers(d.value)
-                }
+                broadcastUsersStatus()
             } else {
                 println("Cannot change vote - user does not exist")
             }
         } else if (messageType == "sendreveal") {
             this.revealed = true
 
-            users.forEach { d ->
-                sendStateOfUsers(d.value)
-            }
+            broadcastUsersStatus()
         } else if (messageType == "sendreset") {
             this.revealed = false
 
@@ -77,8 +86,21 @@ class EstimationSession() {
                 users.replace(d.key, d.value.copy(vote = ""))
             }
 
-            users.forEach { d ->
-                sendStateOfUsers(d.value)
+            broadcastUsersStatus()
+        }
+    }
+
+    fun hasLeaderLeft(): Boolean {
+        return users.contains(leaderId)
+    }
+
+    suspend fun disconnectEverybody() {
+        users.forEach { d ->
+            try {
+                d.value.webSocketSession.close()
+
+            } catch(e: Throwable) {
+                println("Could not send statuses of users - $e")
             }
         }
     }
@@ -91,13 +113,7 @@ class EstimationSession() {
             println("User ${userData.id} removed")
         }
 
-        users.forEach { d ->
-            try {
-                sendStateOfUsers(d.value)
-            } catch(e: Throwable) {
-                println("Could not send state of user")
-            }
-        }
+        broadcastUsersStatus()
     }
 
     suspend fun onError(userData: UserData?, e: Throwable, closeReason: Deferred<CloseReason?>) {
@@ -110,29 +126,31 @@ class EstimationSession() {
             println("User ${userData.id} removed")
         }
 
-        users.forEach { d ->
-            try {
-                sendStateOfUsers(d.value)
-            } catch(e: Throwable) {
-                println("Could not send state of user - $e")
-            }
-        }
+        broadcastUsersStatus()
     }
 
-    private suspend fun sendStateOfUsers(d: UserData) {
-        val userStatuses = users.values.map { u ->
-            if (revealed) {
-                UserStatus(u.id, u.vote)
-            } else if (u.vote.isBlank()) {
-                UserStatus(u.id, "")
-            } else {
-                UserStatus(u.id, "X")
+    private suspend fun broadcastUsersStatus() {
+        users.forEach { d ->
+            try {
+                val allVotesFilled = users.values.all { v -> v.vote.isNotBlank() }
+
+                val userStatuses = users.values.map { u ->
+                    if (allVotesFilled || revealed) {
+                        UserStatus(u.id, u.vote)
+                    } else if (u.vote.isBlank()) {
+                        UserStatus(u.id, "")
+                    } else {
+                        UserStatus(u.id, "X")
+                    }
+                }
+
+                val message = UserStatusMessage("userstatus", d.value.id, leaderId, userStatuses)
+
+                d.value.webSocketSession.send(Frame.Text(gson.toJson(message)))
+            } catch(e: Throwable) {
+                println("Could not send statuses of users - $e")
             }
         }
-
-        val message = UserStatusMessage("userstatus", d.id, userStatuses)
-
-        d.webSocketSession.send(Frame.Text(gson.toJson(message)))
     }
 
 }

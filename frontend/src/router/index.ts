@@ -1,6 +1,6 @@
 import Vue from 'vue';
 import VueRouter, { RouteConfig } from 'vue-router';
-import Home from '../views/Home.vue';
+import SelectRoom from '../views/SelectRoom.vue';
 import Vote from '../views/Vote.vue';
 
 Vue.use(VueRouter);
@@ -8,11 +8,11 @@ Vue.use(VueRouter);
 const routes: RouteConfig[] = [
   {
     path: '/',
-    name: 'Home',
-    component: Home,
+    name: 'SelectRoom',
+    component: SelectRoom,
   },
   {
-    path: '/vote',
+    path: '/vote/:roomid',
     name: 'Vote',
     component: Vote,
   },

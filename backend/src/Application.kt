@@ -2,19 +2,16 @@ package tech.konkit
 
 import io.ktor.application.*
 import io.ktor.response.*
-import io.ktor.request.*
 import io.ktor.routing.*
 import io.ktor.http.*
 import io.ktor.websocket.*
 import io.ktor.http.cio.websocket.*
-import io.ktor.sessions.sessions
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import java.time.*
-import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 
-
-val estmiationSession = EstimationSession()
+val sessions: ConcurrentHashMap<String, EstimationSession> = ConcurrentHashMap()
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
@@ -33,24 +30,48 @@ fun Application.module(testing: Boolean = false) {
             call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
         }
 
-        webSocket("/myws") {
+        webSocket("/voteconnection/{roomnumber}") {
+            val roomNumber = call.parameters["roomnumber"]
+            if (roomNumber.isNullOrBlank()) {
+                throw Exception("Room number empty")
+            }
+
             var userData: UserData? = null
 
+            val estimationSession: EstimationSession = if (!sessions.containsKey(roomNumber)) {
+                val newSession = EstimationSession()
+                sessions.put(roomNumber, newSession)
+                newSession
+            } else {
+                sessions.get(roomNumber)!!
+            }
+
             try {
-                userData = estmiationSession.onUserJoin(this)
+                userData = estimationSession.onUserJoin(this)
 
                 while (true) {
                     val frame = incoming.receive()
                     if (frame is Frame.Text) {
-                        estmiationSession.onUserMessage(userData, frame.readText())
-//                        send(Frame.Text("Client said: " + frame.readText()))
+                        estimationSession.onUserMessage(userData, frame.readText())
                     }
                 }
 
             } catch (e: ClosedReceiveChannelException) {
-                estmiationSession.onUserDisconnected(userData, closeReason)
+                estimationSession.onUserDisconnected(userData, closeReason)
+                if (estimationSession.hasLeaderLeft()) {
+                    estimationSession.disconnectEverybody()
+                    sessions.remove(roomNumber)
+
+                    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
+                }
             } catch (e: Throwable) {
-                estmiationSession.onError(userData, e, closeReason)
+                estimationSession.onError(userData, e, closeReason)
+                if (estimationSession.hasLeaderLeft()) {
+                    estimationSession.disconnectEverybody()
+                    sessions.remove(roomNumber)
+
+                    println("Removed room ${roomNumber}, ${sessions.count()} rooms left")
+                }
             }
         }
     }
