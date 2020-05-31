@@ -3,18 +3,20 @@ package tech.konkit
 import java.util.concurrent.ConcurrentHashMap
 
 class RoomManager() {
-    private val sessions: ConcurrentHashMap<String, EstimationSession> = ConcurrentHashMap()
+    private val rooms: ConcurrentHashMap<String, Room> = ConcurrentHashMap()
 
-    fun createRoom(): String {
-        val newRoomNumber = (sessions.count() + 1).toString()
-        val newSession = EstimationSession()
+    fun createRoom(userId: UserId): String {
+        val newRoomNumber = generateNewRoomNumber()
+        val newSession = Room(leaderId = userId)
 
-        sessions.put(newRoomNumber, newSession)
+        rooms.put(newRoomNumber, newSession)
 
         return newRoomNumber
     }
 
-    fun getSessionByRoomNumber(roomNumber: String): EstimationSession? {
-        return sessions.get(roomNumber)
+    private fun generateNewRoomNumber() = (rooms.count() + 1).toString()
+
+    fun getSessionByRoomNumber(roomNumber: String): Room? {
+        return rooms.get(roomNumber)
     }
 }

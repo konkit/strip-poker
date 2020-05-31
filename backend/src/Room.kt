@@ -1,12 +1,10 @@
 package tech.konkit
 
-import io.ktor.http.cio.websocket.CloseReason
 import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.WebSocketSession
-import kotlinx.coroutines.Deferred
 import java.util.concurrent.ConcurrentHashMap
 
-class EstimationSession() {
+class Room() {
 
     private val serializer = MessageSerializer()
 
@@ -38,7 +36,7 @@ class EstimationSession() {
         }
     }
 
-    suspend fun onUserDisconnected(userId: UserId?, closeReason: Deferred<CloseReason?>) {
+    suspend fun onUserDisconnected(userId: UserId?) {
         if (userId != null) {
             users.remove(userId)
         }

@@ -9,6 +9,7 @@ import io.ktor.websocket.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.sessions.*
 import io.ktor.util.generateNonce
+import io.ktor.util.pipeline.PipelineContext
 import java.time.*
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
@@ -41,20 +42,27 @@ fun Application.module(testing: Boolean = false) {
         }
 
         post("/createroom") {
-            val roomNumber = roomManager.createRoom()
+            val userId = getUserIdFromSession2(call)
+
+            println("Creating room, userId: ${userId}")
+
+            val roomNumber = roomManager.createRoom(userId)
             call.respondText(roomNumber, contentType = ContentType.Text.Plain)
         }
 
         // This enables the use of sessions to keep information between requests/refreshes of the browser.
         install(Sessions) {
-            cookie<UserSession>("SESSION")
+            cookie<UserSession>("USERSESSION")
         }
 
         // This adds an interceptor that will create a specific session in each request if no session is available already.
         intercept(ApplicationCallPipeline.Features) {
+
             if (call.sessions.get<UserSession>() == null) {
                 call.sessions.set(UserSession(generateNonce()))
             }
+
+            println("Intercepting, userId ${call.sessions.get<UserSession>()!!.id}")
         }
 
         webSocket("/voteconnection/{roomnumber}") {
@@ -64,35 +72,55 @@ fun Application.module(testing: Boolean = false) {
                 return@webSocket
             }
 
-            val cookieSession = call.sessions.get<UserSession>()
+            val room = roomManager.getSessionByRoomNumber(roomNumber)
 
-            if (cookieSession == null) {
-                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "No session"))
-                return@webSocket
-            }
-
-            val userId = UserId(cookieSession.id)
-            val estimationSession = roomManager.getSessionByRoomNumber(roomNumber)
-
-            if (estimationSession == null) {
+            if (room == null) {
                 close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "The room ${roomNumber} does not exist"))
                 return@webSocket
             }
 
+            val userId = getUserIdFromSession(call)
+
+            println("Joining room, userId: ${userId}")
+
             try {
-                estimationSession.onUserJoin(userId, this)
+                room.onUserJoin(userId, this)
 
                 while (true) {
                     val frame = incoming.receive()
                     if (frame is Frame.Text) {
-                        estimationSession.onUserMessage(userId, frame.readText())
+                        room.onUserMessage(userId, frame.readText())
                     }
                 }
 
             } finally {
-                estimationSession.onUserDisconnected(userId!!, closeReason)
+                room.onUserDisconnected(userId)
             }
         }
+    }
+}
+
+private fun getUserIdFromSession(call: ApplicationCall): UserId {
+    println("Call: ${call}")
+
+    val cookieSession = call.sessions.get<UserSession>()
+
+    if (cookieSession != null) {
+        return UserId(cookieSession.id)
+    } else {
+        throw Exception("Session is not initialized!")
+    }
+}
+
+private fun getUserIdFromSession2(call: ApplicationCall): UserId {
+    println("Call: ${call}")
+
+    val cookieSession = call.sessions.get<UserSession>()
+
+    if (cookieSession != null) {
+        return UserId(cookieSession.id)
+    } else {
+        throw Exception("Session is not initialized!")
     }
 }
 
