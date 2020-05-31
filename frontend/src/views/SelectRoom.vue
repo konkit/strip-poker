@@ -25,14 +25,26 @@ export default class SelectRoom extends Vue {
     super();
   }
 
+  mounted() {
+    axios
+      .get("http://localhost:9999/")
+      .then(response => console.log(response.data))
+  }
+
   joinRoom() {
     this.$router.push({name: "Vote", params: {roomid: this.roomNumber}})
   }
 
   createRoom() {
-    axios
-      .post("http://localhost:9999/createroom", {})
-      .then(response => this.$router.push({name: "Vote", params: {roomid: response.data}}))
+    // axios
+    //   .post("http://localhost:9999/createroom", {})
+    //   .then(response => this.$router.push({name: "Vote", params: {roomid: response.data}}))
+
+    let ws = new WebSocket("ws://localhost:9999/createroom");
+
+    ws.addEventListener("message", event => { 
+      this.$router.push({name: "Vote", params: {roomid: event.data}})
+    });
   }
 }
 </script>

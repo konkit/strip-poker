@@ -65,6 +65,16 @@ fun Application.module(testing: Boolean = false) {
             println("Intercepting, userId ${call.sessions.get<UserSession>()!!.id}")
         }
 
+        webSocket("/createroom") {
+            val userId = getUserIdFromSession(call)
+
+            println("Creating room via ws, userId: ${userId}")
+
+            val roomNumber = roomManager.createRoom(userId)
+
+            send(Frame.Text(roomNumber))
+        }
+
         webSocket("/voteconnection/{roomnumber}") {
             val roomNumber = call.parameters["roomnumber"]
             if (roomNumber.isNullOrBlank()) {

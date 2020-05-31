@@ -4,20 +4,15 @@ import io.ktor.http.cio.websocket.Frame
 import io.ktor.http.cio.websocket.WebSocketSession
 import java.util.concurrent.ConcurrentHashMap
 
-class Room() {
+class Room(val leaderId: UserId) {
 
     private val serializer = MessageSerializer()
 
     private var revealed: Boolean = false
     private var users = ConcurrentHashMap<UserId, UserData>()
-    private var leaderId: UserId = UserId.empty
 
     suspend fun onUserJoin(userId: UserId, webSocketSession: WebSocketSession): UserId {
         val userData = UserData(webSocketSession = webSocketSession, vote = "")
-
-        if (leaderId == UserId.empty) {
-            leaderId = userId
-        }
 
         users[userId] = userData
 
@@ -113,10 +108,6 @@ class Room() {
 data class UserId(val id: String) {
     override fun toString(): String {
         return id
-    }
-
-    companion object {
-        val empty = UserId("")
     }
 }
 
