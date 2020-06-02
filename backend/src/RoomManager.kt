@@ -1,6 +1,9 @@
 package tech.konkit
 
+import java.time.Instant
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.random.Random
 
 class RoomManager() {
     private val rooms: ConcurrentHashMap<String, Room> = ConcurrentHashMap()
@@ -14,7 +17,7 @@ class RoomManager() {
         return newRoomNumber
     }
 
-    private fun generateNewRoomNumber() = (rooms.count() + 1).toString()
+    private fun generateNewRoomNumber() = "${Instant.now().toEpochMilli()}${Random.nextInt(0, 9999)}"
 
     fun getSessionByRoomNumber(roomNumber: String): Room? {
         return rooms.get(roomNumber)
