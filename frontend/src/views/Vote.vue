@@ -1,17 +1,15 @@
 <template>
-  <div class="home">
-    <div v-if="connected">
-      <h1>Voting - {{ revealed ? "complete" : "pending" }}</h1>
+  <div class='home'>
+    <div v-if='connected'>
+      <h1>Voting - {{ revealed ? 'complete' : 'pending' }}</h1>
 
-      <div class="cast-votes">
+      <div class='cast-votes'>
         <div
           v-for="(user, i) in users"
           class="cast-vote"
           :class="{'your-vote': user.id === yourId}"
           :key="i"
-        >
-          {{user.vote}}
-        </div>
+        >{{user.vote}}</div>
       </div>
 
       <div class="select-vote-wrapper">
@@ -41,69 +39,96 @@
   </div>
 </template>
 
-<script lang="ts">
-import { Component, Vue } from "vue-property-decorator";
-import HelloWorld from "./components/HelloWorld.vue";
+<script lang='ts'>
+import { Component, Vue } from 'vue-property-decorator';
+import HelloWorld from './components/HelloWorld.vue';
 
 enum VotingState {
-  pending = "pending",
-  revealed = "revealed"
+  pending = 'pending',
+  revealed = 'revealed',
 }
 
 enum VoteValue {
-  noVote = "NO",
-  dunno = "?",
-  hidden = "x",
-  small = "S",
-  medium = "M",
-  large = "L"
+  noVote = 'NO',
+  dunno = '?',
+  hidden = 'x',
+  small = 'S',
+  medium = 'M',
+  large = 'L',
 }
 
 @Component
 export default class Home extends Vue {
-  connected = false;
+  public connected = false;
 
-  voteValues = ["S", "M", "L"];
+  public voteValues = ['S', 'M', 'L'];
 
-  users = [];
-  yourId = "";
-  leaderId = "";
-  revealed = false;
+  public users = [];
+  public yourId = '';
+  public leaderId = '';
+  public revealed = false;
 
-  state = VotingState.pending;
+  public state = VotingState.pending;
 
-  yourVote = null;
+  public yourVote?: VoteValue;
 
-  ws = null;
+  private ws?: WebSocket;
 
+  public mounted() {
+    this.connected = false;
+    this.revealed = false;
 
+    const roomId = this.$route.params.roomid;
+    this.ws = new WebSocket('ws://localhost:9999/voteconnection/' + roomId);
 
-  mounted() {
-    this.connected = false
-    this.revealed = false
+    if (this.ws) {
+      this.ws.addEventListener('open', (connectionEvent) => {
+        this.connected = true;
 
-    const roomId = this.$route.params.roomid
-    this.ws = new WebSocket("ws://localhost:9999/voteconnection/" + roomId);
+        this.ws!.addEventListener('message', (event) => {
+          this.handleMessage(event);
+        });
 
-    this.ws.addEventListener("open", event => {
-      this.connected = true;
+        this.ws!.addEventListener('close', (event) => {
+          if (event.reason) {
+            localStorage.flash = event.reason;
+          }
 
-      this.ws.addEventListener("message", event => {
-        this.handleMessage(event)
+          this.$router.push({ name: 'SelectRoom' });
+        });
       });
-
-      this.ws.addEventListener("close", event => {
-        this.$router.push({name: "SelectRoom"})
-      });
-    });
+    }
   }
 
-  handleMessage(event) {
-    console.log("Message from server ", event.data);
+  public selectVote(voteValue: VoteValue) {
+    this.yourVote = voteValue;
 
-    let msg = JSON.parse(event.data);
+    const command = JSON.stringify({
+      messagetype: 'selectvote',
+      vote: voteValue.toString(),
+    });
 
-    if (msg.messagetype == "userstatus") {
+    this.sendCommand(command);
+  }
+
+  public sendReveal(voteValue: VoteValue) {
+    const command = JSON.stringify({ messagetype: 'sendreveal' });
+
+    this.sendCommand(command);
+  }
+
+  public sendReset(voteValue: VoteValue) {
+    this.yourVote = undefined;
+
+    const command = JSON.stringify({ messagetype: 'sendreset' });
+
+    this.sendCommand(command);
+  }
+
+   private handleMessage(event: MessageEvent) {
+    const msg = JSON.parse(event.data);
+
+    if (msg.messagetype === 'userstatus') {
       this.users = msg.users;
       this.yourId = msg.yourId;
       this.yourVote = msg.yourVote;
@@ -112,31 +137,8 @@ export default class Home extends Vue {
     }
   }
 
-  selectVote(voteValue: VoteValue) {
-    this.yourVote = voteValue;
-
-    let command = JSON.stringify({messagetype: "selectvote", vote: voteValue.toString()});
-
-    this.sendCommand(command);
-  }
-
-  sendReveal(voteValue: VoteValue) {
-    let command = JSON.stringify({messagetype: "sendreveal"});
-
-    this.sendCommand(command);
-  }
-
-  sendReset(voteValue: VoteValue) {
-    this.yourVote = null;
-
-    let command = JSON.stringify({ messagetype: "sendreset" });
-
-    this.sendCommand(command);
-  }
-
-  sendCommand(command) {
-    console.log("Command to be sent: ", command);
-    this.ws.send(command);
+  private sendCommand(command: any) {
+    this.ws!.send(command);
   }
 }
 </script>

@@ -1,49 +1,54 @@
 <template>
-  <div class="selectroom">
+  <div class='selectroom'>
     <h1>Strip Poker</h1>
     <h2>simple planning poker app with T-shirt size estimates and an inappropriate name</h2>
+
+    <div v-if='flashMsg'>
+      {{flashMsg}}
+    </div>
 
     <div>
       <h3>Enter room number</h3>
 
-      <input type="text" v-model="roomNumber" />
-      <button @click="joinRoom()">Join</button>
-      <button @click="createRoom()">Create room</button>
+      <input type='text' v-model='roomNumber' />
+      <button @click='joinRoom()'>Join</button>
+      <button @click='createRoom()'>Create room</button>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { Component, Vue } from "vue-property-decorator";
-import axios from "axios"
+<script lang='ts'>
+import { Component, Vue } from 'vue-property-decorator';
+import axios from 'axios';
 
 @Component
 export default class SelectRoom extends Vue {
-  roomNumber = null
+  public roomNumber?: string = '';
+
+  public flashMsg: string = '';
 
   constructor() {
     super();
   }
 
-  mounted() {
-    axios
-      .get("http://localhost:9999/")
-      .then(response => console.log(response.data))
+  public mounted() {
+    if (localStorage.flash) {
+      this.flashMsg = localStorage.flash;
+      localStorage.flash = '';
+    }
   }
 
-  joinRoom() {
-    this.$router.push({name: "Vote", params: {roomid: this.roomNumber}})
+  public joinRoom() {
+    if (this.roomNumber) {
+      this.$router.push({name: 'Vote', params: {roomid: this.roomNumber}});
+    }
   }
 
-  createRoom() {
-    // axios
-    //   .post("http://localhost:9999/createroom", {})
-    //   .then(response => this.$router.push({name: "Vote", params: {roomid: response.data}}))
+  public createRoom() {
+    const ws = new WebSocket('ws://localhost:9999/createroom');
 
-    let ws = new WebSocket("ws://localhost:9999/createroom");
-
-    ws.addEventListener("message", event => { 
-      this.$router.push({name: "Vote", params: {roomid: event.data}})
+    ws.addEventListener('message', (event) => {
+      this.$router.push({name: 'Vote', params: {roomid: event.data}});
     });
   }
 }
