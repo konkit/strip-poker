@@ -2,7 +2,7 @@
   <div class="home">
     <nav class="navbar" role="navigation" aria-label="main navigation">
       <div class="navbar-brand">
-        <a class="navbar-item" href="https://bulma.io">
+        <a class="navbar-item" href="/">
           <p class="is-size-4">Strip Poker</p>
         </a>
 
@@ -28,7 +28,12 @@
 
     <section>
       <v-container v-if="connected">
-        <h1 class="title is-1 has-text-centered">Voting - {{ revealed ? 'complete' : 'pending' }}</h1>
+        <h1 v-if="revealed" class="title is-1 has-text-centered">
+          Voting complete!
+        </h1>
+        <h1 v-else class="title is-1 has-text-centered">
+          Waiting for votes ...
+        </h1>
 
         <div class="container cast-votes">
           <div
@@ -40,7 +45,7 @@
         </div>
 
         <div class="container select-vote-wrapper has-text-centered">
-          <h3 class="title is-3">Select vote</h3>
+          <h3 class="title is-3">Select your vote</h3>
 
           <div class="votes-to-select">
             <div
@@ -181,8 +186,14 @@ export default class Home extends Vue {
 }
 
 .cast-vote {
-  padding: 30px 30px;
+  width: 100px;
+  height: 100px;
+  text-align: center;
   border: 1px solid black;
+  display: flex;
+  flex-direction: column;
+  align-content: center;
+  justify-content: center;
 }
 
 .your-vote {
@@ -200,14 +211,19 @@ export default class Home extends Vue {
   width: 500px;
   display: flex;
   flex-direction: row;
-  /* width: 100%; */
   justify-content: space-around;
 }
 
 .vote {
-  padding: 30px 30px;
+  width: 100px;
+  height: 100px;
+  text-align: center;
   border: 1px solid black;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-content: center;
+  justify-content: center;
 }
 
 .vote-selected {
