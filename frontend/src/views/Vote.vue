@@ -18,7 +18,7 @@
           <span aria-hidden="true"></span>
         </a>
 
-        <div id="navbarBasicExample" class="navbar-menu">
+        <div class="navbar-menu">
           <div class="navbar-start">
             <a class="navbar-item" href="/">Go back</a>
           </div>
@@ -26,84 +26,48 @@
       </div>
     </nav>
 
-    <section>
-      <v-container v-if="connected">
-        <h1 v-if="revealed" class="title is-1 has-text-centered">
-          Voting complete!
-        </h1>
-        <h1 v-else class="title is-1 has-text-centered">
-          Waiting for votes ...
-        </h1>
+    <section v-if="connected">
+      <Board 
+        :users="users" 
+        :yourId="yourId" 
+        :yourVote="yourVote"
+        :leaderId="leaderId" 
+        :revealed="revealed" 
+        @selectvote="selectVote"
+        @sendreveal="sendReveal"
+        @sendreset="sendReset">
+      </Board>
+    </section>
 
-        <div class="container cast-votes">
-          <div
-            v-for="(user, i) in users"
-            class="cast-vote is-size-3"
-            :class="{'your-vote': user.id === yourId}"
-            :key="i"
-          >{{user.vote}}</div>
-        </div>
-
-        <div class="container select-vote-wrapper has-text-centered">
-          <h3 class="title is-3">Select your vote</h3>
-
-          <div class="votes-to-select">
-            <div
-              class="vote"
-              :class="{'vote-selected': voteValue === yourVote}"
-              v-for="(voteValue, i) in voteValues"
-              :key="i"
-              @click="selectVote(voteValue)"
-            >
-              <div class="is-size-3">{{voteValue}}</div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="leaderId == yourId" class="container leader-buttons has-text-centered">
-          <button class="button is-primary" @click="sendReveal()" :disabled="revealed">Reveal</button>
-          <button class="button" @click="sendReset()">Reset</button>
-        </div>
-      </v-container>
-      <v-container v-else>
+    <section v-else>
+      <div class="container">
         <h1>Connecting</h1>
-      </v-container>
+      </div>
     </section>
   </div>
 </template>
 
 <script lang='ts'>
 import { Component, Vue } from "vue-property-decorator";
-import HelloWorld from "./components/HelloWorld.vue";
+import Board from "../components/Board.vue";
+import {VoteValue, voteValues, UserStatus} from "../model"
 
-enum VotingState {
-  pending = "pending",
-  revealed = "revealed"
-}
-
-enum VoteValue {
-  noVote = "NO",
-  dunno = "?",
-  hidden = "x",
-  small = "S",
-  medium = "M",
-  large = "L"
-}
-
-@Component
+@Component({
+  components: {
+    Board
+  }
+})
 export default class Home extends Vue {
-  public connected = false;
+  private connected = false;
 
-  public voteValues = ["S", "M", "L"];
+  private voteValues = voteValues;
 
-  public users = [];
-  public yourId = "";
-  public leaderId = "";
-  public revealed = false;
+  private users: UserStatus[] = [];
+  private yourId = "";
+  private leaderId = "";
+  private revealed = false;
 
-  public state = VotingState.pending;
-
-  public yourVote?: VoteValue;
+  private yourVote?: VoteValue = VoteValue.pending;
 
   private ws?: WebSocket;
 
@@ -134,8 +98,6 @@ export default class Home extends Vue {
   }
 
   public selectVote(voteValue: VoteValue) {
-    this.yourVote = voteValue;
-
     const command = JSON.stringify({
       messagetype: "selectvote",
       vote: voteValue.toString()
@@ -168,6 +130,8 @@ export default class Home extends Vue {
       this.leaderId = msg.leaderId;
       this.revealed = msg.revealed;
     }
+
+    console.log("users: ", this.users)
   }
 
   private sendCommand(command: any) {
@@ -178,59 +142,4 @@ export default class Home extends Vue {
 
 
 <style scoped>
-.cast-votes {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-  margin-top: 30px;
-}
-
-.cast-vote {
-  width: 100px;
-  height: 100px;
-  text-align: center;
-  border: 1px solid black;
-  display: flex;
-  flex-direction: column;
-  align-content: center;
-  justify-content: center;
-}
-
-.your-vote {
-  border: 5px solid black;
-}
-
-.select-vote-wrapper {
-  margin-top: 30px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.votes-to-select {
-  width: 500px;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-}
-
-.vote {
-  width: 100px;
-  height: 100px;
-  text-align: center;
-  border: 1px solid black;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-content: center;
-  justify-content: center;
-}
-
-.vote-selected {
-  border: 5px solid black;
-}
-
-.leader-buttons {
-  margin-top: 20px;
-}
 </style>
