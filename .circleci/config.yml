@@ -17,13 +17,6 @@ jobs:
     - restore_cache:
         key: v1-gradle-cache-{{ checksum "backend-app/build.gradle" }}
 
-    - run:
-        name: Dockerize backend app
-        command: |
-          cd ./backend
-          docker build . -t konkit/strip-poker-frontend	
-          cd ../
-
     - setup_remote_docker
 
     - run: echo "$DOCKER_REGISTRY_PASS" | docker login $DOCKER_REGISTRY_URL --username $DOCKER_REGISTRY_USER --password-stdin
@@ -73,7 +66,7 @@ jobs:
     - run:
         name: Do the upgrade
         command: |
-          ssh $SITE_SSH_USER@$SITE_SSH_HOST "cd /var/app/strip-poker && docker-compose down && docker-compose up -d"
+          ssh $SITE_SSH_USER@$SITE_SSH_HOST "cd /var/app/strip-poker-estimates.tk && docker-compose down && docker-compose up -d"
 
 workflows:
   version: 2
