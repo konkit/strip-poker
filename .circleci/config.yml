@@ -21,7 +21,7 @@ jobs:
         key: v1-gradle-cache-{{ checksum "backend-app/build.gradle" }}
 
     - setup_remote_docker:
-      version: 17.05.0-ce
+        version: 17.05.0-ce
 
     - run: echo "$DOCKER_REGISTRY_PASS" | docker login $DOCKER_REGISTRY_URL --username $DOCKER_REGISTRY_USER --password-stdin
 
