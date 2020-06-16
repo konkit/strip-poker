@@ -1,6 +1,9 @@
 version: 2
 jobs:
   build:
+    machine:
+      image: circleci/classic:edge
+      
     environment:
       _JAVA_OPTIONS: "-Xmx3g"
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2"
@@ -17,7 +20,8 @@ jobs:
     - restore_cache:
         key: v1-gradle-cache-{{ checksum "backend-app/build.gradle" }}
 
-    - setup_remote_docker
+    - setup_remote_docker:
+	      version: 17.05.0-ce
 
     - run: echo "$DOCKER_REGISTRY_PASS" | docker login $DOCKER_REGISTRY_URL --username $DOCKER_REGISTRY_USER --password-stdin
 
