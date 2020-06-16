@@ -21,7 +21,7 @@ jobs:
         name: Dockerize backend app
         command: |
           cd ./backend
-	        docker build . -t konkit/strip-poker-frontend	
+          docker build . -t konkit/strip-poker-frontend	
           cd ../
 
     - setup_remote_docker
@@ -32,7 +32,7 @@ jobs:
         name: Dockerize backend app
         command: |
           cd ./backend
-	        docker build . -t konkit/strip-poker-backend	
+          docker build . -t konkit/strip-poker-backend	
           cd ../
 
     - run: docker tag konkit/strip-poker-backend $DOCKER_REGISTRY_URL/konkit/strip-poker-backend:$CIRCLE_WORKFLOW_ID
