@@ -71,7 +71,7 @@ export default class SelectRoom extends Vue {
   }
 
   public createRoom() {
-    const ws = new WebSocket("ws://localhost:9999/createroom");
+    const ws = new WebSocket(`ws://${window.location.host}/api/createroom`);
 
     ws.addEventListener("message", event => {
       this.$router.push({ name: "Vote", params: { roomid: event.data } });

@@ -9,7 +9,6 @@ import io.ktor.websocket.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.sessions.*
 import io.ktor.util.generateNonce
-import io.ktor.util.pipeline.PipelineContext
 import java.time.*
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
@@ -37,11 +36,7 @@ fun Application.module(testing: Boolean = false) {
     }
 
     routing {
-        get("/") {
-            call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
-        }
-
-        post("/createroom") {
+        post("/api/createroom") {
             val userId = getUserIdFromSession2(call)
 
             println("Creating room, userId: ${userId}")
@@ -65,7 +60,7 @@ fun Application.module(testing: Boolean = false) {
             println("Intercepting, userId ${call.sessions.get<UserSession>()!!.id}")
         }
 
-        webSocket("/createroom") {
+        webSocket("/api/createroom") {
             val userId = getUserIdFromSession(call)
 
             println("Creating room via ws, userId: ${userId}")
@@ -75,7 +70,7 @@ fun Application.module(testing: Boolean = false) {
             send(Frame.Text(roomNumber))
         }
 
-        webSocket("/voteconnection/{roomnumber}") {
+        webSocket("/api/voteconnection/{roomnumber}") {
             val roomNumber = call.parameters["roomnumber"]
             if (roomNumber.isNullOrBlank()) {
                 close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Room number is empty"))

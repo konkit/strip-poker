@@ -6,7 +6,7 @@
     <div class="container cast-votes">
       <div
         v-for="(user, i) in users"
-        class="cast-vote is-size-3"
+        class="vote is-size-3"
         :class="{'your-vote': user.id === yourId}"
         :key="i"
       >{{user.vote}}</div>
@@ -18,7 +18,7 @@
       <div class="votes-to-select">
         <div
           class="vote"
-          :class="{'vote-selected': voteValue === yourVote}"
+          :class="{'vote-selected': voteValue === yourVote, 'selectable': revealed === false}"
           v-for="(voteValue, i) in voteValues"
           :key="i"
           @click="selectVote(voteValue)"
@@ -54,8 +54,6 @@ export default class Board extends Vue {
   }
 
   public selectVote(voteValue: VoteValue) {
-    this.yourVote = voteValue;
-
     this.$emit("selectvote", voteValue);
   }
 
@@ -74,19 +72,9 @@ export default class Board extends Vue {
 .cast-votes {
   display: flex;
   flex-direction: row;
-  justify-content: space-around;
-  margin-top: 30px;
-}
-
-.cast-vote {
-  width: 100px;
-  height: 100px;
-  text-align: center;
-  border: 1px solid black;
-  display: flex;
-  flex-direction: column;
-  align-content: center;
   justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
 }
 
 .your-vote {
@@ -103,19 +91,31 @@ export default class Board extends Vue {
 .votes-to-select {
   display: flex;
   flex-direction: row;
-  justify-content: space-around;
+  justify-content: center;
 }
 
 .vote {
-  width: 100px;
-  height: 100px;
+  margin: 10px;
+
+  width: 50px;
+  min-width: 50px;
+
+  height: 80px;
+  min-height: 80px;
+
   text-align: center;
-  border: 1px solid black;
-  cursor: pointer;
+  border: 1px solid #aaa;
+  border-radius: 5px;
   display: flex;
   flex-direction: column;
   align-content: center;
   justify-content: center;
+  cursor: default;
+}
+
+.vote.selectable:hover {
+  cursor: pointer;
+  background-color: #f5f5f5;
 }
 
 .vote-selected {
@@ -124,5 +124,9 @@ export default class Board extends Vue {
 
 .leader-buttons {
   margin-top: 20px;
+}
+
+.leader-buttons button {
+  margin: 0 10px;
 }
 </style>

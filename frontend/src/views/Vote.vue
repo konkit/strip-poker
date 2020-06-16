@@ -76,7 +76,7 @@ export default class Home extends Vue {
     this.revealed = false;
 
     const roomId = this.$route.params.roomid;
-    this.ws = new WebSocket("ws://localhost:9999/voteconnection/" + roomId);
+    this.ws = new WebSocket(`ws://${window.location.host}/api/voteconnection/${roomId}`);
 
     if (this.ws) {
       this.ws.addEventListener("open", connectionEvent => {
@@ -98,6 +98,8 @@ export default class Home extends Vue {
   }
 
   public selectVote(voteValue: VoteValue) {
+    this.yourVote = voteValue;
+
     const command = JSON.stringify({
       messagetype: "selectvote",
       vote: voteValue.toString()
@@ -130,8 +132,6 @@ export default class Home extends Vue {
       this.leaderId = msg.leaderId;
       this.revealed = msg.revealed;
     }
-
-    console.log("users: ", this.users)
   }
 
   private sendCommand(command: any) {
