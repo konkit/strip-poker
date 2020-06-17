@@ -37,7 +37,7 @@ jobs:
     - run:
         name: Dockerize frontend app
         command: |
-          cd ./vue-app
+          cd ./frontend
           docker build . -t konkit/strip-poker-frontend
           cd ../
 
