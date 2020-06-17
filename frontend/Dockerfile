@@ -2,6 +2,7 @@ FROM node:carbon-alpine as frontendbase
 RUN mkdir /opt/app
 WORKDIR /opt/app
 COPY . ./
+RUN npm install
 RUN npm run build
 
 FROM nginx
