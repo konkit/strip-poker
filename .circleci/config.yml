@@ -13,10 +13,10 @@ jobs:
     - checkout
 
     - restore_cache:
-        key: v1-gradle-wrapper-{{ checksum "backend-app/gradle/wrapper/gradle-wrapper.properties" }}
+        key: v1-gradle-wrapper-{{ checksum "backend/gradle/wrapper/gradle-wrapper.properties" }}
 
     - restore_cache:
-        key: v1-gradle-cache-{{ checksum "backend-app/build.gradle" }}
+        key: v1-gradle-cache-{{ checksum "backend/build.gradle" }}
 
     - setup_remote_docker:
         version: 17.05.0-ce
@@ -48,12 +48,12 @@ jobs:
     - save_cache:
         paths:
         - ~/.gradle/wrapper
-        key: v1-gradle-wrapper-{{ checksum "backend-app/gradle/wrapper/gradle-wrapper.properties" }}
+        key: v1-gradle-wrapper-{{ checksum "backend/gradle/wrapper/gradle-wrapper.properties" }}
 
     - save_cache:
         paths:
         - ~/.gradle/caches
-        key: v1-gradle-cache-{{ checksum "backend-app/build.gradle" }}
+        key: v1-gradle-cache-{{ checksum "backend/build.gradle" }}
 
   deploy:
     machine:
