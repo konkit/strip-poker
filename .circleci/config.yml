@@ -68,7 +68,7 @@ jobs:
     - run:
         name: Do the upgrade
         command: |
-          ssh $SITE_SSH_USER@$SITE_SSH_HOST "cd /var/app/strip-poker-estimates.tk && docker-compose down && docker-compose up -d"
+          ssh $SITE_SSH_USER@$SITE_SSH_HOST "cd /var/app/strip-poker-estimates.tk && /bin/bash update_version.sh $CIRCLE_WORKFLOW_ID && docker-compose down && docker-compose up -d"
 
 workflows:
   version: 2
