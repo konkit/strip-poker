@@ -141,7 +141,7 @@ export default class Home extends Vue {
     this.ws!.send(command);
   }
 
-  private copyUrlToClipboard(e) {
+  private copyUrlToClipboard(e: Event) {
     e.preventDefault();
     navigator.clipboard.writeText(window.location.href);
   }
