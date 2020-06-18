@@ -21,6 +21,7 @@
         <div class="navbar-menu">
           <div class="navbar-start">
             <a class="navbar-item" href="/">Go back</a>
+            <a class="navbar-item" @click="copyUrlToClipboard($event)">Copy URL</a>
           </div>
         </div>
       </div>
@@ -50,7 +51,7 @@
 <script lang='ts'>
 import { Component, Vue } from "vue-property-decorator";
 import Board from "../components/Board.vue";
-import {VoteValue, voteValues, UserStatus} from "../model"
+import { VoteValue, voteValues, UserStatus } from "../model";
 
 @Component({
   components: {
@@ -76,7 +77,9 @@ export default class Home extends Vue {
     this.revealed = false;
 
     const roomId = this.$route.params.roomid;
-    this.ws = new WebSocket(`ws://${window.location.host}/api/voteconnection/${roomId}`);
+    this.ws = new WebSocket(
+      `ws://${window.location.host}/api/voteconnection/${roomId}`
+    );
 
     if (this.ws) {
       this.ws.addEventListener("open", connectionEvent => {
@@ -136,6 +139,11 @@ export default class Home extends Vue {
 
   private sendCommand(command: any) {
     this.ws!.send(command);
+  }
+
+  private copyUrlToClipboard(e) {
+    e.preventDefault();
+    navigator.clipboard.writeText(window.location.href);
   }
 }
 </script>
