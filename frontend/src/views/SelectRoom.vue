@@ -90,7 +90,7 @@ export default class SelectRoom extends Vue {
 }
 
 .hero {
-  background-image: linear-gradient(to bottom, rgba(55,37,212, 0.82), rgba(121,87,213, 0.93)), url("~@/assets/cover2.jpg") !important;
+  background-image: url("~@/assets/cover3.jpg") !important;
   -webkit-background-size: cover;
   -moz-background-size: cover;
   -o-background-size: cover;

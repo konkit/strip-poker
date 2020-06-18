@@ -142,4 +142,8 @@ export default class Home extends Vue {
 
 
 <style scoped>
+.home {
+  max-width: 900px;
+  margin: 0 auto;
+}
 </style>
