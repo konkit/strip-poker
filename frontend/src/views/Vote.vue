@@ -77,8 +77,9 @@ export default class Home extends Vue {
     this.revealed = false;
 
     const roomId = this.$route.params.roomid;
+    const scheme = window.location.protocol === "https:" ? "wss:" : "ws:"
     this.ws = new WebSocket(
-      `ws://${window.location.host}/api/voteconnection/${roomId}`
+      `${scheme}//${window.location.host}/api/voteconnection/${roomId}`
     );
 
     if (this.ws) {
