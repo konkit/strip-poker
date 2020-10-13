@@ -3,17 +3,23 @@
     <h1 v-if="revealed" class="title is-1 has-text-centered">Voting complete!</h1>
     <h1 v-else class="title is-1 has-text-centered">Waiting for votes ...</h1>
 
-    <div class="container cast-votes">
+    <div class="container">
+      <transition-group name="fade" class="cast-votes">
       <div
         v-for="(user, i) in users"
         class="vote is-size-3"
-        :class="{'your-vote': user.id === yourId}"
+        :class="{'your-vote': yourVote && user.id === yourId}"
         :key="i"
-      >{{user.vote}}</div>
+      >
+          <span v-if="revealed">{{user.vote}}</span>
+      </div>
+      </transition-group>
     </div>
 
     <div class="container select-vote-wrapper has-text-centered">
-      <h3 class="title is-3">Select your estimate</h3>
+      <h3 v-if="!revealed" class="title is-3">Select your estimate</h3>
+      <h3 v-if="revealed && isLeader()" class="title is-4">Press the button below to start a new vote</h3>
+      <h3 v-if="revealed && !isLeader()" class="title is-4">Please wait until the host starts a new vote</h3>
 
       <div class="votes-to-select">
         <div
@@ -64,6 +70,10 @@ export default class Board extends Vue {
   public sendReset() {
     this.$emit("sendreset");
   }
+
+  public isLeader() {
+    return this.leaderId === this.yourId
+  }
 }
 </script>
 
@@ -97,11 +107,11 @@ export default class Board extends Vue {
 .vote {
   margin: 10px;
 
-  width: 50px;
-  min-width: 50px;
+  width: 100px;
+  min-width: 100px;
 
-  height: 80px;
-  min-height: 80px;
+  height: 160px;
+  min-height: 160px;
 
   text-align: center;
   border: 1px solid #aaa;
@@ -122,11 +132,22 @@ export default class Board extends Vue {
   border: 5px solid black;
 }
 
+.your-vote {
+  border: 5px solid black;
+}
+
 .leader-buttons {
   margin-top: 20px;
 }
 
 .leader-buttons button {
   margin: 0 10px;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 1.5s;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity: 0;
 }
 </style>

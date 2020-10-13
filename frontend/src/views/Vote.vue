@@ -1,42 +1,30 @@
 <template>
   <div class="home">
-    <nav class="navbar" role="navigation" aria-label="main navigation">
-      <div class="navbar-brand">
-        <a class="navbar-item" href="/">
+    <b-navbar>
+      <template slot="brand">
+        <b-navbar-item tag="router-link" :to="{ path: '/' }">
           <p class="is-size-4">Strip Poker</p>
-        </a>
-
-        <a
-          role="button"
-          class="navbar-burger burger"
-          aria-label="menu"
-          aria-expanded="false"
-          data-target="navbarBasicExample"
-        >
-          <span aria-hidden="true"></span>
-          <span aria-hidden="true"></span>
-          <span aria-hidden="true"></span>
-        </a>
-
-        <div class="navbar-menu">
-          <div class="navbar-start">
-            <a class="navbar-item" href="/">Go back</a>
-            <a class="navbar-item" @click="copyUrlToClipboard($event)">Copy URL</a>
-          </div>
-        </div>
-      </div>
-    </nav>
+        </b-navbar-item>
+      </template>
+      <template slot="start">
+        <b-navbar-item href="/"> Go back </b-navbar-item>
+        <b-navbar-item @click="copyUrlToClipboard($event)">
+          Copy URL
+        </b-navbar-item>
+      </template>
+    </b-navbar>
 
     <section v-if="connected">
-      <Board 
-        :users="users" 
-        :yourId="yourId" 
+      <Board
+        :users="users"
+        :yourId="yourId"
         :yourVote="yourVote"
-        :leaderId="leaderId" 
-        :revealed="revealed" 
+        :leaderId="leaderId"
+        :revealed="revealed"
         @selectvote="selectVote"
         @sendreveal="sendReveal"
-        @sendreset="sendReset">
+        @sendreset="sendReset"
+      >
       </Board>
     </section>
 
@@ -55,8 +43,8 @@ import { VoteValue, voteValues, UserStatus } from "../model";
 
 @Component({
   components: {
-    Board
-  }
+    Board,
+  },
 })
 export default class Home extends Vue {
   private connected = false;
@@ -77,20 +65,20 @@ export default class Home extends Vue {
     this.revealed = false;
 
     const roomId = this.$route.params.roomid;
-    const scheme = window.location.protocol === "https:" ? "wss:" : "ws:"
+    const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
     this.ws = new WebSocket(
       `${scheme}//${window.location.host}/api/voteconnection/${roomId}`
     );
 
     if (this.ws) {
-      this.ws.addEventListener("open", connectionEvent => {
+      this.ws.addEventListener("open", (connectionEvent) => {
         this.connected = true;
 
-        this.ws!.addEventListener("message", event => {
+        this.ws!.addEventListener("message", (event) => {
           this.handleMessage(event);
         });
 
-        this.ws!.addEventListener("close", event => {
+        this.ws!.addEventListener("close", (event) => {
           if (event.reason) {
             localStorage.flash = event.reason;
           }
@@ -102,14 +90,16 @@ export default class Home extends Vue {
   }
 
   public selectVote(voteValue: VoteValue) {
-    this.yourVote = voteValue;
+    if (this.revealed == false) {
+      this.yourVote = voteValue;
 
-    const command = JSON.stringify({
-      messagetype: "selectvote",
-      vote: voteValue.toString()
-    });
+      const command = JSON.stringify({
+        messagetype: "selectvote",
+        vote: voteValue.toString(),
+      });
 
-    this.sendCommand(command);
+      this.sendCommand(command);
+    }
   }
 
   public sendReveal(voteValue: VoteValue) {
